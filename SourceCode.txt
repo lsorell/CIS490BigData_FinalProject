@@ -1,3 +1,7 @@
+-----Command to clean data-----
+db.dirtydataset.find({}, {play_type: true, yards_gained:true, interception:true, fumble_lost:true,rush_attempt:true,pass_attempt:true,pass_touchdown:true,rush_touchdown:true,passer_player_id:true,passer_player_name:true,reciever_player_id:true,reciever_player_name:true,rusher_player_id:true,rusher_player_name:true } ).forEach(function(x){db.cleandata.insert(x);})
+
+-----MapReduce-----
 var mapFunction1 = function() {
 	var value = {
 		touchdown: 0,
