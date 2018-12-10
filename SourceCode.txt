@@ -1,5 +1,8 @@
 -----Command to clean data-----
-db.dirtydataset.find({}, {play_type: true, yards_gained:true, interception:true, fumble_lost:true,rush_attempt:true,pass_attempt:true,pass_touchdown:true,rush_touchdown:true,passer_player_id:true,passer_player_name:true,reciever_player_id:true,reciever_player_name:true,rusher_player_id:true,rusher_player_name:true } ).forEach(function(x){db.cleandata.insert(x);})
+db.dirtydataset.find({}, {play_type: true, yards_gained:true, interception:true, fumble_lost:true,rush_attempt:true,pass_attempt:true,pass_touchdown:true,rush_touchdown:true,passer_player_id:true,passer_player_name:true,receiver_player_id:true,receiver_player_name:true,rusher_player_id:true,rusher_player_name:true } ).forEach(function(x){db.cleandata.insert(x);})
+
+-----Create Test Data-----
+db.cleandata.find().limit(1000).forEach(function(x){db.testdata.insert(x);})
 
 -----MapReduce-----
 var mapFunction1 = function() {
@@ -7,43 +10,41 @@ var mapFunction1 = function() {
 		touchdown: 0,
 		yards: parseInt(this.yards_gained),
 		IsQB: false
-	}
-	if(this.playtype == "run"){
+	};
+	if(this.play_type == "run"){
 		value.touchdown = parseInt(this.rush_touchdown);
-        	emit(this.rusher_player_name, value);
+        emit(this.rusher_player_name, value);
 	}
-	if(this.playtype == "pass"){
+	if(this.play_type == "pass"){
 		value.touchdown = parseInt(this.pass_touchdown);
-                emit(this.reciever_player_name,value);
+        emit(this.receiver_player_name,value);
 		value.IsQB = true;
 		emit(this.passer_player_name,value);
 	}
  };
 
 var reduceFunction1 = function(name, vals) {
-        reducedVal = { totalTouchdowns: 0, totalYards: 0, IsQB: vals.IsQB};
+        reducedVal = { totalTouchdowns: 0, totalYards: 0, IsQB: vals[0].IsQB};
 
-        for (var idx = 0; idx < countObjVals.length; idx++) {
+        for (var idx = 0; idx < vals.length; idx++) {
                          reducedVal.totalTouchdowns += vals[idx].touchdown;
                          reducedVal.totalYards += vals[idx].yards;
                      }
-
         return reducedVal;
 };
 
 
 var finalizeFunction1 = function (name, vals) {
-
-        var result = {name:name,points:0};
+	vals.points = 0;
+	
 	if(!vals.IsQB){
-		result.points += Math.floor(vals.totalYards / 10);
-		result.points += vals.totalTouchdowns * 6;
+		vals.points += Math.floor(vals.totalYards / 10);
+		vals.points += vals.totalTouchdowns * 6;
 	}else{
-		result.points += Math.floor(vals.totalYards / 25);
-		result.points += vals.totalTouchdowns * 4;
+		vals.points += Math.floor(vals.totalYards / 25);
+		vals.points += vals.totalTouchdowns * 4;
 	}	
-        return result;
-
+    return vals;
 };
 
 
@@ -51,9 +52,35 @@ db.cleandata.mapReduce(
 	mapFunction1,
 	reduceFunction1,
 	{
-		out: {merge: "players_points"},
-		sort: {points: -1},
+		out: "players_points",		
 		finalize: finalizeFunction1
-	
-	}
-)
+	})
+		
+db.testdata.mapReduce(
+	mapFunction1,
+	reduceFunction1,
+	{
+		out: "players_points",		
+		finalize: finalizeFunction1
+	})
+-----Sorting-----
+
+
+-----Troubleshooting-----
+-----Mapper-----
+var emit = function(key, value) {
+	print("emit");
+	print("key: " + key + "  value: " + tojson(value));
+}
+
+var myDoc = db.testdata.findOne( { _id: ObjectId("5c0c8fcd4881fd17b071cf99") } );
+mapFunction1.apply(myDoc);
+
+var myCursor = db.testdata.find( { passer_player_name: "T.Brady" } );
+
+while (myCursor.hasNext()) {
+    var doc = myCursor.next();
+    print ("document _id= " + tojson(doc._id));
+    mapFunction1.apply(doc);
+    print();
+}
