@@ -2,21 +2,21 @@
 db.dirtydataset.find({}, {play_type: true, yards_gained:true, interception:true, fumble_lost:true,rush_attempt:true,pass_attempt:true,pass_touchdown:true,rush_touchdown:true,passer_player_id:true,passer_player_name:true,receiver_player_id:true,receiver_player_name:true,rusher_player_id:true,rusher_player_name:true } ).forEach(function(x){db.cleandata.insert(x);})
 
 -----Create Test Data-----
-db.cleandata.find().limit(1000).forEach(function(x){db.testdata.insert(x);})
+db.cleandata.find().limit(1000).forEach(function(x){db.testdata1000.insert(x);})
 
 -----MapReduce-----
 var mapFunction1 = function() {
 	var value = {
-		touchdown: 0,
-		yards: parseInt(this.yards_gained),
+		touchdowns: 0,
+		yards: parseFloat(this.yards_gained),
 		IsQB: false
 	};
 	if(this.play_type == "run"){
-		value.touchdown = parseInt(this.rush_touchdown);
+		value.touchdowns = parseFloat(this.rush_touchdown);
         emit(this.rusher_player_name, value);
 	}
 	if(this.play_type == "pass"){
-		value.touchdown = parseInt(this.pass_touchdown);
+		value.touchdowns = parseFloat(this.pass_touchdown);
         emit(this.receiver_player_name,value);
 		value.IsQB = true;
 		emit(this.passer_player_name,value);
@@ -24,26 +24,22 @@ var mapFunction1 = function() {
  };
 
 var reduceFunction1 = function(name, vals) {
-        reducedVal = { totalTouchdowns: 0, totalYards: 0, IsQB: vals[0].IsQB};
-
+        reducedVal = { touchdowns: 0, yards: 0, IsQB: vals[0].IsQB};
         for (var idx = 0; idx < vals.length; idx++) {
-                         reducedVal.totalTouchdowns += vals[idx].touchdown;
-                         reducedVal.totalYards += vals[idx].yards;
-                     }
-        return reducedVal;
+            reducedVal.touchdowns += vals[idx].touchdowns;
+            reducedVal.yards += vals[idx].yards;
+        }
+		return reducedVal;
 };
 
 
-var finalizeFunction1 = function (name, vals) {
-	vals.points = 0;
-	
-	if(!vals.IsQB){
-		vals.points += Math.floor(vals.totalYards / 10);
-		vals.points += vals.totalTouchdowns * 6;
-	}else{
-		vals.points += Math.floor(vals.totalYards / 25);
-		vals.points += vals.totalTouchdowns * 4;
-	}	
+var finalizeFunction1 = function(name, vals) {
+	vals.points = 0;	
+	if(vals.IsQB == false){	vals.points += Math.floor(vals.yards / 10.0);
+		vals.points += vals.touchdowns * 6;
+	}else{ vals.points += Math.floor(vals.yards / 25.0);
+		vals.points += vals.touchdowns * 4;
+	}
     return vals;
 };
 
@@ -63,6 +59,13 @@ db.testdata.mapReduce(
 		out: "players_points",		
 		finalize: finalizeFunction1
 	})
+	
+db.testdata1000.mapReduce(
+	mapFunction1,
+	reduceFunction1,
+	{
+		out: "players_points",	
+		finalize: finalizeFunction1})
 -----Sorting-----
 
 
